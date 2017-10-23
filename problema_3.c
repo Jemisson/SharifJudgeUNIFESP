@@ -1,234 +1,193 @@
-#include<stdio.h>
-#include<stdlib.h>
- 
-typedef struct t_celula{
-    struct t_celula *direita, *abaixo;
-    int linha, coluna, valor;
-}tipo_celula;
- 
-typedef struct{
-    int m, n;
-    tipo_celula *inicio, *fimLinha, *fimColuna;
-}matriz_esparsa;
- 
-int insereCabecaColuna(matriz_esparsa *mat){
-    tipo_celula *cabeca;
-    cabeca = (tipo_celula*)malloc(sizeof(tipo_celula));
- 
-    if (!cabeca) return 0;
- 
-    cabeca->coluna = -1;
-    cabeca->linha = 0;
- 
-    mat->fimColuna->direita = cabeca;
-    mat->fimColuna = cabeca;
- 
-    cabeca->direita = mat->inicio;
-    cabeca->abaixo = cabeca;
-    return 1;
-}
- 
-int insereCabecaLinha(matriz_esparsa *mat){
-    tipo_celula *cabeca;
-    cabeca = (tipo_celula*)malloc(sizeof(tipo_celula));
- 
-    if (!cabeca) return 0;
- 
-    cabeca->coluna = 0;
-    cabeca->linha = -1;
- 
-    mat->fimLinha->abaixo = cabeca;
-    mat->fimLinha = cabeca;
- 
-    cabeca->abaixo = mat->inicio;
-    cabeca->direita = cabeca;
- 
-    return 1;
-}
- 
-int iniciaCabecas(matriz_esparsa *mat){
-    int i=0;
- 
-    tipo_celula *cabeca;
-    cabeca = (tipo_celula*)malloc(sizeof(tipo_celula));
- 
-    if (!cabeca) return 0;
- 
-    cabeca->coluna = -1;
-    cabeca->linha = -1;
- 
-    mat->inicio = cabeca;
-    mat->fimLinha = cabeca;
-    mat->fimColuna = cabeca;
- 
-    for (i = 1; i <= mat->n; i++){
-        insereCabecaColuna(mat);
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct aux
+{
+    int linha;
+    int coluna;
+    int valor;
+    struct aux *proxLinha;
+    struct aux *proxColuna;
+} ELEMENTO, *PONT;
+
+typedef struct
+{
+    int numLinhas;
+    int numColunas;
+    PONT *ALinha;
+    PONT *AColuna;
+} MATRIZ;
+
+void inicializar(MATRIZ *m, int numLinhas, int numColunas){
+    m->numLinhas = numLinhas;
+    m->numColunas = numColunas;
+    m->ALinha = (PONT *)malloc(numLinhas * sizeof(ELEMENTO));
+    m->AColuna = (PONT *)malloc(numColunas * sizeof(ELEMENTO));
+    int c;
+    for (c = 0; c < numLinhas; c++){
+        m->ALinha[c] = NULL;
     }
-    for (i = 1; i <= mat->m; i++){
-        insereCabecaLinha(mat);
+    for (c = 0; c < numColunas; c++){
+        m->AColuna[c] = NULL;
     }
-    return 1;
 }
- 
-matriz_esparsa *cria_matriz_esparsa(int m, int n){
-    matriz_esparsa *mat;
-    mat = (matriz_esparsa *)malloc(sizeof(matriz_esparsa));
- 
-    if (!mat || m<=0 || n<=0){
+
+void exibir(MATRIZ *m){
+    int c;
+    PONT aux;
+    for (c = 0; c < m->numLinhas; c++){
+        aux = m->ALinha[c];
+        while (aux != NULL){
+            printf("%d %d %d\n", aux->linha, aux->coluna, aux->valor);
+            aux = aux->proxLinha;
+        }
+    }
+}
+
+int inserir(MATRIZ *m, int linha, int coluna, int valor){
+    if (linha < 0 || linha >= m->numLinhas || coluna < 0 || coluna >= m->numColunas){
+        return -1;
+    }
+    PONT atual = m->ALinha[linha];
+    PONT anterior = NULL;
+    while (atual != NULL && atual->coluna < coluna){
+        anterior = atual;
+        atual = atual->proxLinha;
+    }
+    if (atual != NULL && atual->coluna == coluna){
+        if (valor != 0){
+            atual->valor = valor;
+            return 0;
+        }
+        else{
+            if (anterior == NULL){
+                m->ALinha[linha] = atual->proxLinha;
+            }
+            else{
+                anterior->proxLinha = atual->proxLinha;
+            }
+            anterior = NULL;
+            atual = m->AColuna[coluna];
+            while (atual != NULL && atual->linha != linha){
+                anterior = atual;
+                atual = atual->proxColuna;
+            }
+            if (anterior == NULL){
+                m->AColuna[coluna] = atual->proxColuna;
+            }
+            else{
+                anterior->proxColuna = atual->proxColuna;
+            }
+            free(atual);
+            return 0;
+        }
+    }
+    if (valor == 0){
         return 0;
     }
- 
-    mat->inicio = NULL;
-    mat->fimLinha = NULL;
-    mat->fimColuna = NULL;
-    mat->m = m;
-    mat->n = n;
- 
-    iniciaCabecas(mat);
- 
-    return mat;
-}
- 
- 
-int obtemElementoPeloIndice(matriz_esparsa *mat, int linha, int coluna){
-    tipo_celula *pCelula;
-    int i = 0;
- 
-    pCelula = mat->inicio->direita;
- 
-    for (i = 0; i < coluna-1; i++){
-        pCelula = pCelula->direita;
+    PONT novo = (PONT)malloc(sizeof(ELEMENTO));
+    novo->coluna = coluna;
+    novo->linha = linha;
+    novo->valor = valor;
+    if (anterior == NULL){
+        novo->proxLinha = m->ALinha[linha];
+        m->ALinha[linha] = novo;
     }
- 
-    do{
-        pCelula = pCelula->abaixo;
-        if (pCelula->linha == linha){
-            return pCelula->valor;
-        }
-    }while(pCelula->coluna != -1);
- 
+    else{
+        novo->proxLinha = anterior->proxLinha;
+        anterior->proxLinha = novo;
+    }
+    atual = m->AColuna[coluna];
+    anterior = NULL;
+    while (atual != NULL && atual->linha < linha){
+        anterior = atual;
+        atual = atual->proxColuna;
+    }
+    if (anterior == NULL){
+        novo->proxColuna = m->AColuna[coluna];
+        m->AColuna[coluna] = novo;
+    }
+    else{
+        novo->proxColuna = anterior->proxColuna;
+        anterior->proxColuna = novo;
+    }
     return 0;
 }
 
-void multiplicaMatriz(matriz_esparsa *matA, matriz_esparsa *matB){
-    int i=0, j=0, k=0, total;
- 
-    if (matA->n == matB->m){
-        for (i = 1; i <= matA->m; i++){
-            for (j = 1; j <= matB->n; j++){
-                total = 0;
-                for (k = 1; k <= matA->n; k++){
-                    total += obtemElementoPeloIndice(matA,i,k) * obtemElementoPeloIndice(matB,k,j);
+int multiplicar(MATRIZ *m1, MATRIZ *m2, MATRIZ *result){
+	
+	//printf("%d %d", m1->numColunas, m2->numLinhas);
+    if (m1->numColunas != m2->numLinhas){
+    	printf("-1\n");
+        return -1;
+    }
+    inicializar(result, m1->numLinhas, m2->numColunas);
+    int c;
+    for (c = 0; c < m1->numLinhas; c++){
+    	
+        int i;
+        for (i = 0; i < m2->numColunas; i++){
+            int valor = 0;
+            PONT atual = m1->ALinha[c];
+            PONT atualM2 = m2->AColuna[i];
+            while (atual != NULL){
+            	
+                while (atualM2 != NULL && atualM2->linha < atual->coluna){
+                    atualM2 = atualM2->proxColuna;
                 }
-                if (total){
-                    printf("%d %d %d\n", i, j, total);
+                if (atualM2 != NULL && atualM2->linha == atual->coluna){
+                    valor += atual->valor * atualM2->valor;
                 }
+                atual = atual->proxLinha;
+                atualM2 = m2->AColuna[i];
+            }
+            if (valor != 0){
+                inserir(result, c, i, valor);
             }
         }
-    } else {
-        printf("%d", -1);
     }
-    
+    return 0;
 }
 
-int insere(matriz_esparsa *mat, int linha, int coluna, int valor){
-    int i;
- 
-    if (linha>mat->m || coluna>mat->n || !valor || linha < 1 || coluna < 1){
-        return 0;
-    }
-
-    tipo_celula *pCelula;
-    tipo_celula *pCelulaColuna;
-    tipo_celula *pCelulaLinha;
- 
-    pCelula = (tipo_celula*)malloc(sizeof(tipo_celula));
- 
-    if (!pCelula) return 0;
- 
-    pCelula->linha = linha;
-    pCelula->coluna = coluna;
-    pCelula->valor = valor;
- 
-    pCelulaLinha = mat->inicio->abaixo;
-    pCelulaColuna = mat->inicio->direita;
- 
-    for (i=0; i<linha-1; i++){
-        pCelulaLinha = pCelulaLinha->abaixo;
-    }
-    i=0;
-    while (i<coluna && pCelulaLinha->direita->linha != -1){
-        if (pCelulaLinha->direita->coluna > pCelula->coluna){
-            pCelula->direita = pCelulaLinha->direita;
-            pCelulaLinha->direita = pCelula;
-        }
-        else{
-            pCelulaLinha = pCelulaLinha->direita;
-        }
-        i++;
-    }
-    if (pCelulaLinha->direita->linha == -1){
-        pCelula->direita = pCelulaLinha->direita;
-        pCelulaLinha->direita = pCelula;
-    }
- 
-    for (i = 0; i < coluna-1; i++){
-        pCelulaColuna = pCelulaColuna->direita;
-    }
-    i=0;
-    while (i<linha && pCelulaColuna->abaixo->coluna != -1){
-        if (pCelulaColuna->abaixo->linha > pCelula->linha){
-            pCelula->abaixo = pCelulaColuna->abaixo;
-            pCelulaColuna->abaixo = pCelula;
-        }
-        else{
-            pCelulaColuna = pCelulaColuna->abaixo;
-        }
-        i++;
-    }
-    if (pCelulaColuna->abaixo->coluna == -1){
-        pCelula->abaixo = pCelulaColuna->abaixo;
-        pCelulaColuna->abaixo = pCelula;
-    }
-    return 1;
+int main(){
+	
+	MATRIZ M1, M2, M3;
+	int m, n, N, i, linha , coluna, valor, op, resp;
+	inicializar(&M3, 1, 1);
+	
+	scanf("%d %d %d", &m, &n, &N);
+	inicializar(&M1, m+1, n+1);
+	
+	for(i=0; i<N; i++){
+	    scanf("%d %d %d", &linha, &coluna, &valor);
+	    inserir(&M1, linha, coluna, valor);
+	}
+	
+	scanf("%d %d %d", &m, &n, &N);
+	inicializar(&M2, m+1, n+1);
+	
+	for(i=0; i<N; i++){
+	    scanf("%d %d %d", &linha, &coluna, &valor);
+	    inserir(&M2, linha, coluna, valor);
+	}
+	
+	scanf("%d",&op);
+	 //1 ab e 2 ba
+	if(op == 1){
+		resp = multiplicar(&M1, &M2, &M3);
+	} 
+	else{
+	   if(op == 2){
+	    	resp = multiplicar(&M2, &M1, &M3);
+	   	} 
+		else{
+	    	return 0;
+	    }
+	}
+	//exibirMatriz(&M1);
+	//exibirMatriz(&M2);
+	if(resp!=-1)
+		exibir(&M3);
+	
+	return 0;
 }
- 
-int main() {
-   
-    int i, j, m, n, N, linha, coluna, valor, op;
-    matriz_esparsa *matA;
-    matriz_esparsa *matB;
-    
-    scanf("%d %d %d", &m, &n, &N);
-    
-    matA = cria_matriz_esparsa(m, n);
-    
-    for(i=0; i<N; i++){
-        scanf("%d %d %d", &linha, &coluna, &valor);
-        insere(matA, linha, coluna, valor);
-    }
-    
-    scanf("%d %d %d", &m, &n, &N);
-    
-    matB = cria_matriz_esparsa(m, n);
-    
-    for(i=0; i<N; i++){
-        scanf("%d %d %d", &linha, &coluna, &valor);
-        insere(matB, linha, coluna, valor);
-    }
-   
-   scanf("%d",&op);
-   
-   if(op == 1){
-       multiplicaMatriz(matA, matB);
-   } else {
-       if(op == 2){
-           multiplicaMatriz(matB, matA);
-       } else {
-           printf("%d", -1);
-       }
-   }
-   
-   return 0;
-}
-// matriz transposta para só andar pos linhas.
